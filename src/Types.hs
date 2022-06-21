@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -246,34 +247,36 @@ instance Exception SException where
 type Env = M.HashMap T.Text SVal
 
 -- | The interpreter monad.
-newtype Interp a = Interp { unInterp :: ReaderT Env IO a }
-    deriving
-    ( Functor
-    , Applicative
-    , Monad
-    , MonadReader Env
-    , MonadIO
-    , MonadThrow
-    , MonadFix
-    )
+--
+-- @Interp@ is strict when putting values into it, so that pure errors are not ignored. All of the
+-- following throw when run.
+-- 
+-- > pure undefined                   :: Interp ()
+-- > fmap (const undefined) (pure ()) :: Interp ()
+-- > liftIO (pure undefined)          :: Interp ()
+newtype Interp a = Interp
+    { runInterp :: Env -> IO a  -- ^ Runs the action with the given bindings.
+    } deriving (MonadReader Env, MonadThrow, MonadFix) via ReaderT Env IO
 
--- | Runs the 'Interp' action with the given bindings.
-runInterp :: Interp a -> Env -> IO a
-runInterp = runReaderT . unInterp
+instance Functor Interp where
+    fmap = liftM
 
--- | The interpreter monad for running top level values.
-newtype InterpS a = InterpS { unInterpS :: StateT Env IO a }
-    deriving
-    ( Functor
-    , Applicative
-    , Monad
-    , MonadState Env
-    , MonadIO
-    , MonadThrow
-    , MonadCatch
-    , MonadMask
-    )
+instance Applicative Interp where
+    pure  = Interp . const . (pure $!)
+    (<*>) = ap
 
--- | Runs the 'InterpS' action with the given bindings.
+instance Monad Interp where
+    m >>= f = Interp $ \env -> runInterp m env >>= flip runInterp env . f
+
+instance MonadIO Interp where
+    liftIO = Interp . const . (id <$!>)
+
+-- | The interpreter monad for running 'TopLevel' values.
+newtype InterpS a = InterpS
+    { unInterpS :: StateT Env IO a
+    } deriving
+        (Functor, Applicative, Monad, MonadState Env, MonadIO, MonadThrow, MonadCatch, MonadMask)
+
+-- | Runs the action with the given bindings.
 runInterpS :: InterpS a -> Env -> IO a
 runInterpS = evalStateT . unInterpS
