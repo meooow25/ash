@@ -70,6 +70,7 @@ data SVal
     | Procedure Procedure
     | Nil
     | Promise Prom
+    | EOF
     | Unspec
     deriving Show
 
@@ -121,6 +122,7 @@ instance Eq SVal where
     Procedure _ == Procedure _ = False   -- cannot compare procedures
     Nil         == Nil         = True
     Promise _   == Promise _   = False   -- cannot compare promises
+    EOF         == EOF         = True
     Unspec      == Unspec      = True
     _           == _           = False
 
@@ -144,6 +146,7 @@ writesVal = \case
     Procedure _ -> "#<procedure>"
     Nil         -> "()"
     Promise _   -> "#<promise>"
+    EOF         -> "#<eof>"
     Unspec      -> "#<unspecified>"
 
 writesChar :: Char -> B.Builder

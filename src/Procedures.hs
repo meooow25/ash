@@ -20,6 +20,7 @@ import Data.Function
 import Data.Text.Lazy (toStrict)
 import Data.Void
 import System.IO
+import System.IO.Error
 import qualified Data.HashMap.Strict as M
 import qualified Text.Megaparsec as P
 import qualified Text.Megaparsec.Char as P
@@ -30,6 +31,7 @@ import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Vector as V
 
 import Conv
+import Parse
 import Types
 import Util
 
@@ -133,10 +135,17 @@ nativeProcedures = M.fromList $ second (Procedure . MkProcedure) <$>
     , ("close-input-port",      closeInputPort)
     , ("close-output-port",     closeOutputPort)
 
+    , ("read-char",   readChar)
+    , ("eof-object?", eofObjectq)
+    , ("char-ready?", charReadyq)
+
     , ("write",      write)
     , ("display",    display)
     , ("newline",    newline)
     , ("write-char", writeChar)
+
+    , ("read-line",        readLine)
+    , ("read-from-string", readFromString)
     ]
 
 type Proc = [SVal] -> IO SVal
@@ -465,6 +474,22 @@ closeInputPort, closeOutputPort :: Proc
 closeInputPort  = mk1 $ convM cInPort >=> (Unspec <$) . hClose
 closeOutputPort = mk1 $ convM cOutPort >=> (Unspec <$) . hClose
 
+-----------------
+-- 6.6.3  Input
+
+readChar :: Proc
+readChar = inPort0or1 $ \h -> catchIf isEOFError (Char <$> hGetChar h) (const (pure EOF))
+
+eofObjectq :: Proc
+eofObjectq = mk1 $ pure . Boolean . \case EOF -> True; _ -> False
+
+charReadyq :: Proc
+charReadyq = inPort0or1 $ \h ->
+    catchIf isEOFError (Boolean <$> hReady h) (const (pure $ Boolean True))
+
+inPort0or1 :: (Handle -> IO SVal) -> Proc
+inPort0or1 f = mk0or1 (f stdin) (convM cInPort >=> f)
+
 ------------------
 -- 6.6.3  Output
 
@@ -490,3 +515,25 @@ writeChar = mk1or2 f1 f2
     f1 c   = join $ go <$> convM cChar c <*> pure stdout
     f2 c p = join $ go <$> convM cChar c <*> convM cOutPort p
     go c h = Unspec <$ hPutChar h c
+
+-----------------
+-- Non-standard
+
+-- The standard describes the procedure "read" which parses SVals from a port.
+-- This is troublesome to add because we would need an incremental parser, which our parser is not.
+-- It might be possible to use lazy IO, but it'll complicate things.
+--
+-- Instead of "read", the procedures "read-line" and "read-from-string" are provided as substitute,
+-- sort of.
+
+-- | Reads a single line of input from a port.
+readLine :: Proc
+readLine = inPort0or1 $ \h -> catchIf isEOFError (String . T.pack <$> hGetLine h) (const (pure EOF))
+
+-- | Parses a string into a list of Scheme values.
+readFromString :: Proc
+readFromString = mk1 $
+    convM cString >=>
+    either (const $ throwM e) (pure . mkSList) . readManyPrettyErr "<string>"
+  where
+    e = SException "parse failed"
