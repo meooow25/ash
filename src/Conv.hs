@@ -23,6 +23,7 @@ module Conv
     , cProcedure
     , cNil
     , cPromise
+    , cEnvSpec
     , cList
     , cNonEmpty
     , cNonEmpty2
@@ -111,6 +112,9 @@ cProcedure = Conv (expect "procedure") $ \case Procedure (MkProcedure f) -> Just
 
 cPromise :: Conv Prom
 cPromise = Conv (expect "promise") $ \case Promise p -> Just p; _ -> Nothing
+
+cEnvSpec :: Conv EnvSpec
+cEnvSpec = Conv (expect "environment specifier") $ \case EnvSpec s -> Just s; _ -> Nothing
 
 cList :: Conv [SVal]
 cList = Conv (expect "list") $ \case

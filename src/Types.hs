@@ -15,6 +15,7 @@ module Types
     , Prom
     , mkProm
     , unProm
+    , EnvSpec(..)
       -- * Conversions to string
     , writeVal
     , displayVal
@@ -70,6 +71,7 @@ data SVal
     | Procedure Procedure
     | Nil
     | Promise Prom
+    | EnvSpec EnvSpec
     | EOF
     | Unspec
     deriving Show
@@ -110,6 +112,12 @@ mkProm m = do
 instance Show Prom where
     show _ = "Prom <promise>"
 
+-- | A Scheme environment specifier.
+data EnvSpec
+    = ReportEnv5  -- ^ Scheme report environment
+    | NullEnv5    -- ^ Null environment
+    deriving (Eq, Show)
+
 instance Eq SVal where
     Boolean x   == Boolean y   = x == y
     Pair x1 x2  == Pair y1 y2  = x1 == y1 && x2 == y2
@@ -122,6 +130,7 @@ instance Eq SVal where
     Procedure _ == Procedure _ = False   -- cannot compare procedures
     Nil         == Nil         = True
     Promise _   == Promise _   = False   -- cannot compare promises
+    EnvSpec x   == EnvSpec y   = x == y
     EOF         == EOF         = True
     Unspec      == Unspec      = True
     _           == _           = False
@@ -146,6 +155,7 @@ writesVal = \case
     Procedure _ -> "#<procedure>"
     Nil         -> "()"
     Promise _   -> "#<promise>"
+    EnvSpec _   -> "#<environment>"
     EOF         -> "#<eof>"
     Unspec      -> "#<unspecified>"
 

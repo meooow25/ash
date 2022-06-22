@@ -5,6 +5,8 @@
 --
 -- The procedures here are those that can only be implemented natively or are simply easier to
 -- implement natively. Other standard procedures are written in Scheme, see @lib-scm/lib.scm@.
+--
+-- The @eval@ procedure is native but defined in the "Run" module.
 module Procedures
     ( nativeProcedures
     ) where
@@ -123,6 +125,9 @@ nativeProcedures = M.fromList $ second (Procedure . MkProcedure) <$>
     , ("procedure?", procedureq)
     , ("apply",      apply)
     , ("force",      force)
+
+    , ("scheme-report-environment", schemeReportEnvironment)
+    , ("null-environment",          nullEnvironment)
 
     , ("call-with-input-file",  callWithInputFile)
     , ("call-with-output-file", callWithOutputFile)
@@ -440,6 +445,18 @@ apply = mk2' $ \(proc', arg :| args) -> join $ convM cProcedure proc' <*> cat ar
 
 force :: Proc
 force = mk1 $ convM cPromise >=> unProm
+
+--------------
+-- 6.5  Eval
+
+schemeReportEnvironment, nullEnvironment :: Proc
+schemeReportEnvironment = envProc ReportEnv5
+nullEnvironment         = envProc NullEnv5
+
+envProc :: EnvSpec -> Proc
+envProc spec = mk1 $ convM cNum >=> \case
+    5 -> pure $ EnvSpec spec
+    _ -> throwM $ SException "version must be 5"
 
 -----------------
 -- 6.6.1  Ports
