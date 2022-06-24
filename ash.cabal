@@ -63,11 +63,13 @@ test-suite test-ash
   main-is:          Main.hs
   other-modules:
       AstParseTests
+    , EvalTests
     , ParseTests
     , TestUtil
   build-depends:
       HUnit  >= 1.6.2  && < 1.7
     , base
+    , exceptions
     , text
     , ash
   hs-source-dirs:   tests
